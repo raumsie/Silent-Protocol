@@ -1,0 +1,18 @@
+[gd_scene load_steps=3 format=3 uid="uid://vxpewtvkbyrt"]
+
+[ext_resource type="Script" uid="uid://da5pfwi0ub251" path="res://Scripts/Objective.gd" id="1_dq3p1"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_dq3p1"]
+
+[node name="Objective" type="Area2D"]
+script = ExtResource("1_dq3p1")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_dq3p1")
+
+[node name="ColorRect" type="ColorRect" parent="."]
+offset_left = -10.0
+offset_top = -10.0
+offset_right = 10.0
+offset_bottom = 10.0
+color = Color(0, 0.771581, 0.2852, 1)
