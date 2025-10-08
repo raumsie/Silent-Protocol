@@ -1,10 +1,11 @@
-[gd_scene load_steps=8 format=3 uid="uid://loiasydkfgpm"]
+[gd_scene load_steps=10 format=3 uid="uid://loiasydkfgpm"]
 
 [ext_resource type="Texture2D" uid="uid://dc5qtravbmmy8" path="res://Tilesets/tileset x3.png" id="1_0ba56"]
 [ext_resource type="Script" uid="uid://1av83bh5gibc" path="res://Scripts/Level.gd" id="1_xylue"]
 [ext_resource type="PackedScene" uid="uid://bgqii44imwpuf" path="res://Scenes/player.tscn" id="2_fuudy"]
 [ext_resource type="PackedScene" uid="uid://dgf7ra8af1gf8" path="res://Scenes/enemy.tscn" id="3_xylue"]
 [ext_resource type="PackedScene" uid="uid://vxpewtvkbyrt" path="res://Scenes/objective.tscn" id="4_tj5wv"]
+[ext_resource type="PackedScene" uid="uid://hm3o2foxwd2m" path="res://addons/vision_cone_2d/examples/wall.tscn" id="6_tj5wv"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_0ba56"]
 texture = ExtResource("1_0ba56")
@@ -1949,6 +1950,12 @@ texture_region_size = Vector2i(32, 32)
 tile_size = Vector2i(32, 32)
 sources/1 = SubResource("TileSetAtlasSource_0ba56")
 
+[sub_resource type="Curve2D" id="Curve2D_ienac"]
+_data = {
+"points": PackedVector2Array(0, 0, 0, 0, 16.2278, 161.215, 0, 0, 0, 0, 105.781, -21.6462, 0, 0, 0, 0, 500.058, -11.3077, 0, 0, 0, 0, 523.96, 123.754, 0, 0, 0, 0, 397.882, 173.815, 0, 0, 0, 0, 16.8289, 161.215)
+}
+point_count = 6
+
 [node name="Game" type="Node2D"]
 script = ExtResource("1_xylue")
 
@@ -1964,9 +1971,25 @@ layer_2/z_index = 2
 
 [node name="Player" parent="." instance=ExtResource("2_fuudy")]
 position = Vector2(17, -6)
+collision_mask = 3
 
 [node name="Objective" parent="." instance=ExtResource("4_tj5wv")]
-position = Vector2(-169.818, -241)
+position = Vector2(250, -190)
 
-[node name="Enemy" parent="." instance=ExtResource("3_xylue")]
-position = Vector2(-137.091, -101)
+[node name="Enemy" parent="." node_paths=PackedStringArray("move_on_path") instance=ExtResource("3_xylue")]
+position = Vector2(133, -185)
+move_on_path = NodePath("../Path2D/PathFollow2D")
+movement_speed = 2.1
+
+[node name="Wall" parent="." instance=ExtResource("6_tj5wv")]
+position = Vector2(46, 118)
+scale = Vector2(3, 1)
+
+[node name="Path2D" type="Path2D" parent="."]
+position = Vector2(-449, -316)
+scale = Vector2(1.66381, 3.09524)
+curve = SubResource("Curve2D_ienac")
+
+[node name="PathFollow2D" type="PathFollow2D" parent="Path2D"]
+position = Vector2(16.2278, 161.215)
+rotation = -1.11539

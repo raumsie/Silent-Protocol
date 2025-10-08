@@ -1,8 +1,8 @@
 extends CharacterBody2D
 
 @export var speed: int = 200
-@export var color: Color = Color.RED
-@export var camera_zoom: float = 1.5  # Zoom out to see more area
+@export var color: Color = Color.BLUE
+@export var camera_zoom: float = 1.5 
 
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
 @onready var visual: ColorRect = $ColorRect
@@ -36,10 +36,10 @@ func _physics_process(delta):
 	var direction = get_input()
 	
 	if direction != Vector2.ZERO:
-		# Accelerate toward target speed
+		
 		velocity = velocity.move_toward(direction * speed, acceleration)
 	else:
-		# Apply friction when not moving
+		# Apply friction when not using movement keys
 		velocity = velocity.move_toward(Vector2.ZERO, friction)
 	
 	move_and_slide()

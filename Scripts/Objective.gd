@@ -11,7 +11,7 @@ func _ready():
 
 func setup_visual():
 	visual.color = color
-	visual.size = Vector2(28, 28)  # Slightly different size to distinguish
+	visual.size = Vector2(28, 28) 
 	visual.position = Vector2(-14, -14)
 
 func _on_body_entered(body):

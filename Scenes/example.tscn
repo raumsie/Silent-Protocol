@@ -1,0 +1,13 @@
+[gd_scene load_steps=2 format=3 uid="uid://v4f5s7lg3tfd"]
+
+[ext_resource type="PackedScene" uid="uid://cgfg7eijokn1i" path="res://addons/vision_cone_2d/examples/example.tscn" id="1_3lp0a"]
+
+[node name="example" instance=ExtResource("1_3lp0a")]
+
+[editable path="Enemy"]
+[editable path="Enemy/VisionCone2D"]
+[editable path="Enemy2"]
+[editable path="Enemy2/VisionCone2D"]
+[editable path="Enemy3"]
+[editable path="Enemy3/VisionCone2D"]
+[editable path="Level/Window"]

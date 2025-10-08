@@ -1,0 +1,11 @@
+[gd_scene load_steps=2 format=3 uid="uid://cdwl7mppminbg"]
+
+[ext_resource type="PackedScene" uid="uid://bulute7i5ksyy" path="res://addons/vision_cone_2d/examples/enemy.tscn" id="1_k1u35"]
+
+[node name="EnemyWithVision" instance=ExtResource("1_k1u35")]
+is_rotating = true
+
+[node name="VisionConeCollider" parent="VisionCone2D/VisionConeArea" index="0"]
+polygon = PackedVector2Array(65.9994, 180, -54.0007, 183, -5.06799e-05, 14)
+
+[editable path="VisionCone2D"]

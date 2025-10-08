@@ -1,4 +1,3 @@
-# autoload script
 extends Node
 
 signal game_won
