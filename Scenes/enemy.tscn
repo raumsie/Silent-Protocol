@@ -9,27 +9,19 @@
 [node name="Enemy" type="CharacterBody2D" node_paths=PackedStringArray("vision_renderer")]
 script = ExtResource("1_hghv2")
 vision_renderer = NodePath("VisionCone2D/VisionConeRenderer2")
+alert_color = Color(1, 0, 0, 1)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 visible = false
 shape = SubResource("CapsuleShape2D_ne65n")
 
-[node name="ColorRect" type="ColorRect" parent="."]
-visible = false
-offset_left = -9.0
-offset_top = -11.0
-offset_right = 9.0
-offset_bottom = 12.0
-color = Color(1, 0, 0, 1)
-
 [node name="VisionCone2D" parent="." instance=ExtResource("2_1f0kj")]
 angle_deg = 45
-debug_lines = true
-debug_shape = true
 
 [node name="VisionConeRenderer2" type="Polygon2D" parent="VisionCone2D"]
 
 [node name="VisionConeArea2" type="Area2D" parent="VisionCone2D"]
+unique_name_in_owner = true
 
 [node name="VisionConeCollider" type="CollisionPolygon2D" parent="VisionCone2D/VisionConeArea2"]
 polygon = PackedVector2Array(190, 458, -192, 459, -2, 11)
@@ -39,3 +31,6 @@ texture = ExtResource("3_afpow")
 hframes = 10
 vframes = 38
 frame = 120
+
+[connection signal="body_entered" from="VisionCone2D/VisionConeArea2" to="." method="_on_vision_cone_area_2_body_entered"]
+[connection signal="body_exited" from="VisionCone2D/VisionConeArea2" to="." method="_on_vision_cone_area_2_body_exited"]

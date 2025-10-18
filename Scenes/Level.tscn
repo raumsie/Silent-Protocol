@@ -1992,4 +1992,4 @@ curve = SubResource("Curve2D_ienac")
 
 [node name="PathFollow2D" type="PathFollow2D" parent="Path2D"]
 position = Vector2(16.2278, 161.215)
-rotation = -1.11539
+rotation = -1.1153958

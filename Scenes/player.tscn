@@ -13,14 +13,6 @@ script = ExtResource("1_v0iea")
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("CapsuleShape2D_f60y1")
 
-[node name="ColorRect" type="ColorRect" parent="."]
-visible = false
-offset_left = -8.0
-offset_top = -10.0
-offset_right = 7.0
-offset_bottom = 11.0
-color = Color(0, 1, 1, 1)
-
 [node name="Camera2D" type="Camera2D" parent="."]
 
 [node name="Sprite2D" type="Sprite2D" parent="."]

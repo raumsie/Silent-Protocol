@@ -5,20 +5,20 @@ extends CharacterBody2D
 @export var camera_zoom: float = 1.5 
 
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
-@onready var visual: ColorRect = $ColorRect
+#@onready var visual: ColorRect = $ColorRect
 @onready var camera: Camera2D = $Camera2D
 
 @export var acceleration: float = 15.0
 @export var friction: float = 10.0
 
 func _ready():
-	setup_visual()
+	#setup_visual()
 	setup_camera()
 
-func setup_visual():
-	visual.color = color
-	visual.size = Vector2(24, 32)
-	visual.position = Vector2(-12, -16)
+#func setup_visual():
+	#visual.color = color
+	#visual.size = Vector2(24, 32)
+	#visual.position = Vector2(-12, -16)
 
 func setup_camera():
 	camera.zoom = Vector2(camera_zoom, camera_zoom)
