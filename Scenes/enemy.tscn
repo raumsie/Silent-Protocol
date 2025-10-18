@@ -9,16 +9,20 @@
 [node name="Enemy" type="CharacterBody2D" node_paths=PackedStringArray("vision_renderer")]
 script = ExtResource("1_hghv2")
 vision_renderer = NodePath("VisionCone2D/VisionConeRenderer2")
-alert_color = Color(1, 0, 0, 1)
+alert_color = Color(0.6, 0.27058825, 0.24705882, 0.36862746)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 visible = false
 shape = SubResource("CapsuleShape2D_ne65n")
 
-[node name="VisionCone2D" parent="." instance=ExtResource("2_1f0kj")]
+[node name="VisionCone2D" parent="." node_paths=PackedStringArray("write_polygon2d") instance=ExtResource("2_1f0kj")]
+show_behind_parent = true
 angle_deg = 45
+write_polygon2d = NodePath("VisionConeRenderer2")
 
 [node name="VisionConeRenderer2" type="Polygon2D" parent="VisionCone2D"]
+show_behind_parent = true
+color = Color(0.43137255, 0.92941177, 0.2784314, 0.28627452)
 
 [node name="VisionConeArea2" type="Area2D" parent="VisionCone2D"]
 unique_name_in_owner = true
@@ -27,6 +31,7 @@ unique_name_in_owner = true
 polygon = PackedVector2Array(190, 458, -192, 459, -2, 11)
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
+visibility_layer = 7
 texture = ExtResource("3_afpow")
 hframes = 10
 vframes = 38

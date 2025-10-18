@@ -61,7 +61,9 @@ func _ready():
 		print("Vision Renderer Z Index: ", vision_renderer.z_index)
 		print("Vision Renderer Polygon Points: ", vision_renderer.polygon.size())
 		print("Current Color: ", vision_renderer.color)
-	
+
+# Uncomment to debug color change	
+'''
 	# Force a color change to test visibility
 	await get_tree().create_timer(0.5).timeout
 	if vision_renderer:
@@ -72,7 +74,7 @@ func _ready():
 	if vision_renderer:
 		vision_renderer.color = Color.BLUE
 		print("Test: Changed to BLUE")
-
+'''
 
 
 
