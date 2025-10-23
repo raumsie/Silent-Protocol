@@ -3,6 +3,10 @@ extends Node
 signal game_won
 signal game_lost
 
+# Enemy signals
+signal player_spotted(enemy, player_position)
+signal player_lost(enemy, last_known_position)
+
 var current_state = "playing"
 
 func win_game():
