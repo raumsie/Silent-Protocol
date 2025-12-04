@@ -20,6 +20,7 @@ shape = SubResource("CapsuleShape2D_ne65n")
 
 [node name="VisionCone2D" parent="." node_paths=PackedStringArray("write_polygon2d") instance=ExtResource("2_1f0kj")]
 show_behind_parent = true
+rotation = -1.5707964
 angle_deg = 45
 write_polygon2d = NodePath("VisionConeRenderer2")
 

@@ -1,0 +1,10 @@
+[gd_scene load_steps=3 format=3 uid="uid://e15kns4pxx0p"]
+
+[ext_resource type="Script" uid="uid://d1if3uvjj086x" path="res://Scripts/reticle.gd" id="1_q3m2b"]
+[ext_resource type="Texture2D" uid="uid://d8sn64lc45kb" path="res://Assets/UI/STRANDED UI PACK/Reticles/Reticle9.png" id="2_xrw5o"]
+
+[node name="Reticle" type="Node2D"]
+script = ExtResource("1_q3m2b")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture = ExtResource("2_xrw5o")

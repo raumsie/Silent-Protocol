@@ -24,9 +24,19 @@ enum State { PATROL, COMBAT, SEARCH }
 @export var rotation_speed: float = 0.1
 @export var rotation_angle: float = 90
 
-# State variables
+@export_group("Combat")
+@export var health: int = 2
+@export var can_be_meleed: bool = true
+@export var damage_amount: int = 25
+@export var attack_cooldown: float = 0.50
+
+# Combat variables
 var current_state: State = State.PATROL
 var player_ref: Node2D = null
+var can_attack: bool = true
+var last_attack_time: float = 0.0
+
+# State variables
 var player_last_known_position: Vector2
 var search_timer: float = 0.0
 var patrol_index: int = 0
@@ -53,6 +63,7 @@ var time_since_state_change: float = 0.0
 
 func _ready():
 	rot_start = rotation
+	can_attack = true
 
 	setup_vision_renderer()
 	setup_navigation()
@@ -213,7 +224,7 @@ func pick_new_search_target():
 
 func update_patrol(delta):
 	if use_patrol_path and path_follow:
-        # Direct path following
+		# Direct path following
 		path_follow.progress += patrol_speed * delta
 		global_position = path_follow.global_position
 
@@ -221,27 +232,30 @@ func update_patrol(delta):
 			rotation = path_follow.rotation
 		elif is_rotating:
 			rotation = rot_start + sin(Time.get_ticks_msec()/1000.0 * rotation_speed) * deg_to_rad(rotation_angle/2.0)
-                    
+					
 	elif patrol_points.size() > 0:
-        # Use navigation for manual patrol points
+		# Use navigation for manual patrol points
 		if patrol_index < patrol_points.size():
 			var target_point = patrol_points[patrol_index]
 			move_towards_target(target_point, patrol_speed)
-            
+			
 			if global_position.distance_to(target_point) < 15.0:
 				patrol_index = (patrol_index + 1) % patrol_points.size()
 				print("Moving to next patrol point: ", patrol_index)
-                
-            # Update rotation based on movement
+				
+			# Update rotation based on movement
 			update_rotation_based_on_movement(delta)
 	else:
-        # Stationary patrol with rotation
+		# Stationary patrol with rotation
 		if is_rotating:
 			rotation = rot_start + sin(Time.get_ticks_msec()/1000.0 * rotation_speed) * deg_to_rad(rotation_angle/2.0)
 
 
 # COMBAT BEHAVIOR
 func update_combat(delta):
+	if current_state != State.COMBAT:
+		return
+
 	combat_timer += delta
 	
 	if combat_timer > max_combat_time and not has_player_in_sight:
@@ -251,14 +265,20 @@ func update_combat(delta):
 	
 	if player_ref and is_instance_valid(player_ref) and has_player_in_sight:
 		# Update last known position
-		player_last_known_position = player_ref.global_position
-		# Move towards player
-		move_towards_target(player_last_known_position, combat_speed)
-		# Update rotation to face player
-		var direction_to_player = (player_last_known_position - global_position).normalized()
-
-		if direction_to_player.length() > 0.1:
-			rotation = direction_to_player.angle()
+		var distance_to_player = global_position.distance_to(player_ref.global_position)
+		
+		# Attack if player is in range and cooldown is ready
+		if distance_to_player < 40.0 and can_attack:
+			attack_player()
+		
+		# Move toward player if not in attack range
+		elif distance_to_player > 45.0:
+			move_towards_target(player_ref.global_position, combat_speed)
+			
+			# Face the player
+			var direction_to_player = (player_ref.global_position - global_position).normalized()
+			if direction_to_player.length() > 0.1:
+				rotation = direction_to_player.angle()
 
 	else:
 		# Player not in sight 
@@ -272,6 +292,19 @@ func update_combat(delta):
 		if global_position.distance_to(player_last_known_position) < 25.0:
 			print("Reached last known player position, switching to SEARCH state")
 			set_state(State.SEARCH)		
+
+func attack_player():
+	if not can_attack or not player_ref:
+		return
+	
+	print("Enemy attacking player!")
+	player_ref.take_damage(damage_amount)
+	
+	# Attack cooldown
+	can_attack = false
+	last_attack_time = Time.get_ticks_msec()
+	await get_tree().create_timer(attack_cooldown).timeout
+	can_attack = true
 
 
 func update_search(delta):
@@ -347,6 +380,7 @@ func _on_vision_cone_area_2_body_entered(body: Node2D):
 		# Always switch to COMBAT on detection
 		if current_state != State.COMBAT:
 			set_state(State.COMBAT)
+			print("Enemy state: PATROL > COMBAT")
 
 
 func _on_vision_cone_area_2_body_exited(body: Node2D):
@@ -361,4 +395,43 @@ func _on_vision_cone_area_2_body_exited(body: Node2D):
 
 		
 		if current_state == State.COMBAT:
-			pass
+			current_state = State.SEARCH
+			print("Enemy state: COMBAT > SEARCH")
+
+
+func take_damage(damage: int, shot_from_position: Vector2):
+	health -= damage
+	print("Enemy took damage! Health: ", health)
+	
+	# Set last known position to where shot came from
+	player_last_known_position = shot_from_position
+	
+	# Always go to combat when shot
+	if current_state != State.COMBAT:
+		set_state(State.COMBAT)
+	
+	# Check for death
+	if health <= 0:
+		die()
+
+func takedown():
+	if not can_be_meleed:
+		return
+	
+	print("Enemy taken down by melee!")
+	die()
+
+func die():
+	print("Enemy died!")
+	# Disable the enemy
+	set_physics_process(false)
+	set_process(false)
+	# Optional: Play death animation
+	# Then remove from scene
+	queue_free()
+
+func player_detected(player):
+	# Called when melee attack fails
+	player_last_known_position = player.global_position
+	if current_state != State.COMBAT:
+		set_state(State.COMBAT)

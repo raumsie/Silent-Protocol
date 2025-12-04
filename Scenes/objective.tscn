@@ -17,3 +17,11 @@ texture = ExtResource("2_agiu3")
 hframes = 24
 vframes = 22
 frame = 48
+
+[node name="RichTextLabel" type="RichTextLabel" parent="."]
+offset_left = -40.0
+offset_top = -73.0
+offset_right = 42.0
+offset_bottom = -43.0
+text = "Objective
+"
