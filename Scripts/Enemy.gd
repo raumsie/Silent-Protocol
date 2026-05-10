@@ -61,6 +61,13 @@ var time_since_state_change: float = 0.0
 @onready var vision_cone = $VisionCone2D
 @onready var navigation_agent: NavigationAgent2D = $NavigationAgent2D
 
+# LOS function to check for walls on layer 2
+func has_line_of_sight_to(target: Vector2) -> bool:
+	var space_state = get_world_2d().direct_space_state
+	var query = PhysicsRayQueryParameters2D.create(global_position, target, 2)  # Check collision layer 2 (walls)
+	var result = space_state.intersect_ray(query)
+	return result.is_empty()
+
 func _ready():
 	rot_start = rotation
 	can_attack = true
@@ -163,6 +170,7 @@ func start_patrol():
 		find_closest_patrol_point()
 	else:
 		print("No patrol configured, enemy will remain stationary")
+	
 
 '''
 func find_closest_point_on_path() -> Vector2:
@@ -208,7 +216,7 @@ func start_combat():
 	# Put combat logic here
 	print("Starting combat")
 	combat_timer = 0.0
-	has_player_in_sight = true
+	# has_player_in_sight is set by line of sight check
 
 func start_search():
 	print("Starting search")
@@ -362,6 +370,16 @@ func _physics_process(delta):
 		State.SEARCH:
 			update_search(delta)
 	
+	# Check LOS to player if in vision cone
+	if player_ref and is_instance_valid(player_ref):
+		var los = has_line_of_sight_to(player_ref.global_position)
+		if los != has_player_in_sight:
+			has_player_in_sight = los
+			if los and current_state != State.COMBAT:
+				set_state(State.COMBAT)
+			elif not los and current_state == State.COMBAT:
+				set_state(State.SEARCH)
+	
 	# Apply movement
 	if velocity.length() > 0:
 		move_and_slide()
@@ -372,15 +390,10 @@ func _on_vision_cone_area_2_body_entered(body: Node2D):
 		return
 	  
 	if body.name == "Player" or body.is_in_group("player"):
-		print("Player detected by enemy")
+		print("Player entered vision cone")
 		player_ref = body
 		player_last_known_position = body.global_position
-		has_player_in_sight = true
-
-		# Always switch to COMBAT on detection
-		if current_state != State.COMBAT:
-			set_state(State.COMBAT)
-			print("Enemy state: PATROL > COMBAT")
+		# Line of sight will be checked in _physics_process
 
 
 func _on_vision_cone_area_2_body_exited(body: Node2D):
@@ -388,14 +401,12 @@ func _on_vision_cone_area_2_body_exited(body: Node2D):
 		return
 		
 	if body.name == "Player" or body.is_in_group("player"):
-		print("Player lost by enemy")
-
-		# Player lost, keep reference
+		print("Player exited vision cone")
 		has_player_in_sight = false
-
+		player_ref = null
 		
 		if current_state == State.COMBAT:
-			current_state = State.SEARCH
+			set_state(State.SEARCH)
 			print("Enemy state: COMBAT > SEARCH")
 
 
