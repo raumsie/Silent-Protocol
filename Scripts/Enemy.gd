@@ -1,6 +1,5 @@
 extends CharacterBody2D
 
-# State enumeration
 enum State { PATROL, COMBAT, SEARCH }
 
 @export var vision_renderer: Polygon2D
@@ -30,41 +29,50 @@ enum State { PATROL, COMBAT, SEARCH }
 @export var damage_amount: int = 25
 @export var attack_cooldown: float = 0.50
 
-# Combat variables
+# Combat
 var current_state: State = State.PATROL
 var player_ref: Node2D = null
 var can_attack: bool = true
 var last_attack_time: float = 0.0
 
-# State variables
+# State
 var player_last_known_position: Vector2
 var search_timer: float = 0.0
 var patrol_index: int = 0
 var path_follow: PathFollow2D
 
-# Search variables
+# Search
 var search_center: Vector2
 var search_radius: float = 100.0
 var current_search_target: Vector2
 
-# Combat variables
+# Combat
 var combat_timer: float = 0.0
 var max_combat_time: float = 10.0
 var has_player_in_sight: bool = false
 
-# Rotation variables
+# Global alert / A* pathfinding
+var is_alerted: bool = false
+var path_waypoints: PackedVector2Array = PackedVector2Array()
+var current_waypoint_index: int = 0
+var astar_target_position: Vector2 = Vector2.ZERO
+
+# Periodic re-broadcast interval while actively chasing
+var alert_rebroadcast_timer: float = 0.0
+const ALERT_REBROADCAST_INTERVAL: float = 0.75
+
+# Rotation
 var rot_start: float = 0.0
 var time_since_state_change: float = 0.0
 
 
-# References
 @onready var vision_cone = $VisionCone2D
 @onready var navigation_agent: NavigationAgent2D = $NavigationAgent2D
 
-# LOS function to check for walls on layer 2
+# Raycast LOS check against walls (layer 2)
 func has_line_of_sight_to(target: Vector2) -> bool:
 	var space_state = get_world_2d().direct_space_state
-	var query = PhysicsRayQueryParameters2D.create(global_position, target, 2)  # Check collision layer 2 (walls)
+	var query = PhysicsRayQueryParameters2D.create(global_position, target, 2)
 	var result = space_state.intersect_ray(query)
 	return result.is_empty()
 
@@ -75,28 +83,30 @@ func _ready():
 	setup_vision_renderer()
 	setup_navigation()
 	setup_patrol_path()
-	
+
+	if not is_in_group("enemies"):
+		add_to_group("enemies")
+
+	if not GameManager.player_spotted.is_connected(_on_global_alert):
+		GameManager.player_spotted.connect(_on_global_alert)
+
 	# Wait for plugin to initialize
 	await get_tree().create_timer(0.5).timeout
 	force_vision_cone_update()
-	
+
 	set_state(State.PATROL)
 
 func setup_navigation():
 	if not navigation_agent:
 		push_error("NavigationAgent2D not found")
-		#navigation_agent = $NavigationAgent2D
-	
 
 	navigation_agent.path_desired_distance = 4.0
 	navigation_agent.target_desired_distance = 4.0
 	navigation_agent.path_max_distance = 1000.0
-		
+
 	if not navigation_agent.navigation_finished.is_connected(_on_navigation_finished):
 		navigation_agent.navigation_finished.connect(_on_navigation_finished)
-		# Wait for navigation to be ready
-		#await get_tree().process_frame
-		
+
 	print("Navigation configured successfully")
 
 
@@ -109,19 +119,15 @@ func setup_patrol_path():
 			path_follow = PathFollow2D.new()
 			patrol_path.add_child(path_follow)
 			print("Patrol path configured with new PathFollow2D")
-		#path_follow = PathFollow2D.new()
-		#patrol_path.add_child(path_follow)
-		#print("Patrol path configured with Path2D")
 	elif patrol_points.size() > 0:
 		print("Manual patrol points configured: ", patrol_points.size())
 	else:
 		print("No patrol path - enemy will be stationary")
 
-# State management
 func set_state(new_state: State):
 	if current_state == new_state:
 		return
-			
+
 	print("Enemy state: ", State.keys()[current_state], " → ", State.keys()[new_state])
 
 	match current_state:
@@ -131,8 +137,7 @@ func set_state(new_state: State):
 			print("Exiting COMBAT state")
 
 	current_state = new_state
-	
-	# State entry logic
+
 	match current_state:
 		State.PATROL:
 			vision_renderer.color = patrol_color
@@ -147,6 +152,40 @@ func set_state(new_state: State):
 			start_search()
 
 
+# Radio alert from another enemy that spotted the player
+func _on_global_alert(spotted_enemy: Node, player_pos: Vector2):
+	if spotted_enemy == self:
+		return
+
+	# Already engaged — just refresh the target, no delay needed
+	if current_state == State.COMBAT:
+		print(name, ": already in COMBAT, refreshing last known player position from ", spotted_enemy.name, " (", player_last_known_position, " -> ", player_pos, ")")
+		player_last_known_position = player_pos
+		return
+
+	if is_alerted:
+		print(name, " ignoring global alert (radio delay already in progress)")
+		return
+
+	is_alerted = true
+
+	print("Global alert received by ", name, " from ", spotted_enemy.name, ". Waiting 1s for radio animation...")
+	await get_tree().create_timer(1.0).timeout
+	print(name, " radio delay finished. Engaging COMBAT toward ", player_pos)
+
+	# Re-check in case state changed during the wait
+	if not is_instance_valid(self) or current_state == State.COMBAT:
+		is_alerted = false
+		return
+
+	player_last_known_position = player_pos
+	path_waypoints = PackedVector2Array()
+	current_waypoint_index = 0
+
+	set_state(State.COMBAT)
+	is_alerted = false
+
+
 func setup_vision_renderer():
 	if vision_renderer:
 		vision_renderer.visible = true
@@ -157,7 +196,7 @@ func force_vision_cone_update():
 	if vision_cone and vision_cone.has_method("_update_render_polygon"):
 		vision_cone._update_render_polygon()
 
-# PATROL BEHAVIOR
+# Patrol
 
 func start_patrol():
 	print("Starting patrol")
@@ -170,28 +209,7 @@ func start_patrol():
 		find_closest_patrol_point()
 	else:
 		print("No patrol configured, enemy will remain stationary")
-	
 
-'''
-func find_closest_point_on_path() -> Vector2:
-	if not patrol_path or not path_follow:
-		return global_position
-
-	var curve = patrol_path.curve
-	if curve.get_point_count() == 0:
-		return global_position
-
-	# Convert enemy position to local path coordinates
-	var local_pos = patrol_path.to_local(global_position)
-
-	# Find closest point on curve
-	var closest_offset = curve.get_closest_offset(local_pos)
-
-	# Get position of offset
-	var closest_position = curve.sample_baked(closest_offset)
-
-	return patrol_path.to_global(closest_position)
-'''
 
 func find_closest_patrol_point():
 	if patrol_points.size() == 0:
@@ -208,15 +226,14 @@ func find_closest_patrol_point():
 
 
 	patrol_index = closest_index
-	print("Resuming patrol at point index: ", patrol_index, " (distance: ", min_distance, ")")			
+	print("Resuming patrol at point index: ", patrol_index, " (distance: ", min_distance, ")")
 
 
 
 func start_combat():
-	# Put combat logic here
 	print("Starting combat")
 	combat_timer = 0.0
-	# has_player_in_sight is set by line of sight check
+	alert_rebroadcast_timer = 0.0
 
 func start_search():
 	print("Starting search")
@@ -232,7 +249,6 @@ func pick_new_search_target():
 
 func update_patrol(delta):
 	if use_patrol_path and path_follow:
-		# Direct path following
 		path_follow.progress += patrol_speed * delta
 		global_position = path_follow.global_position
 
@@ -240,18 +256,16 @@ func update_patrol(delta):
 			rotation = path_follow.rotation
 		elif is_rotating:
 			rotation = rot_start + sin(Time.get_ticks_msec()/1000.0 * rotation_speed) * deg_to_rad(rotation_angle/2.0)
-					
+
 	elif patrol_points.size() > 0:
-		# Use navigation for manual patrol points
 		if patrol_index < patrol_points.size():
 			var target_point = patrol_points[patrol_index]
 			move_towards_target(target_point, patrol_speed)
-			
+
 			if global_position.distance_to(target_point) < 15.0:
 				patrol_index = (patrol_index + 1) % patrol_points.size()
 				print("Moving to next patrol point: ", patrol_index)
-				
-			# Update rotation based on movement
+
 			update_rotation_based_on_movement(delta)
 	else:
 		# Stationary patrol with rotation
@@ -259,56 +273,84 @@ func update_patrol(delta):
 			rotation = rot_start + sin(Time.get_ticks_msec()/1000.0 * rotation_speed) * deg_to_rad(rotation_angle/2.0)
 
 
-# COMBAT BEHAVIOR
+# Combat
 func update_combat(delta):
 	if current_state != State.COMBAT:
 		return
 
 	combat_timer += delta
-	
+
 	if combat_timer > max_combat_time and not has_player_in_sight:
 		print("Max combat time exceeded, switching to SEARCH state")
 		set_state(State.SEARCH)
 		return
-	
+
 	if player_ref and is_instance_valid(player_ref) and has_player_in_sight:
-		# Update last known position
+		# Direct LOS — clear stale A* path
+		path_waypoints = PackedVector2Array()
+		current_waypoint_index = 0
+
+		# Periodic re-broadcast so allies' target stays fresh during the chase
+		alert_rebroadcast_timer += delta
+		if alert_rebroadcast_timer >= ALERT_REBROADCAST_INTERVAL:
+			alert_rebroadcast_timer = 0.0
+			print(name, ": periodic re-broadcast - still have LOS on player, re-emitting player_spotted at ", player_ref.global_position)
+			GameManager.player_spotted.emit(self, player_ref.global_position)
+
 		var distance_to_player = global_position.distance_to(player_ref.global_position)
-		
-		# Attack if player is in range and cooldown is ready
+
 		if distance_to_player < 40.0 and can_attack:
 			attack_player()
-		
-		# Move toward player if not in attack range
+
 		elif distance_to_player > 45.0:
 			move_towards_target(player_ref.global_position, combat_speed)
-			
-			# Face the player
+
 			var direction_to_player = (player_ref.global_position - global_position).normalized()
 			if direction_to_player.length() > 0.1:
 				rotation = direction_to_player.angle()
 
 	else:
-		# Player not in sight 
-		# Go to last known position
-		move_towards_target(player_last_known_position, combat_speed)
+		# Player not in sight - pursue last known position
+		if has_line_of_sight_to(player_last_known_position):
+			path_waypoints = PackedVector2Array()
+			current_waypoint_index = 0
+			move_towards_target(player_last_known_position, combat_speed)
+		else:
+			move_towards_target_with_astar(player_last_known_position, combat_speed)
 
-		# Update rotation based on movement
 		update_rotation_based_on_movement(delta)
 
-		# If reached last known position, switch to SEARCH
+		# Reached last-known position without LOS — check if an ally still sees the player
 		if global_position.distance_to(player_last_known_position) < 25.0:
-			print("Reached last known player position, switching to SEARCH state")
-			set_state(State.SEARCH)		
+			var ally_with_eyes_on_player: Node = find_ally_with_eyes_on_player()
+			if ally_with_eyes_on_player:
+				print(name, ": reached last known position with no LOS, but ", ally_with_eyes_on_player.name, " still has eyes on the player - refreshing pursuit target instead of giving up to SEARCH")
+				player_last_known_position = ally_with_eyes_on_player.player_ref.global_position
+				path_waypoints = PackedVector2Array()
+				current_waypoint_index = 0
+			else:
+				print("Reached last known player position, switching to SEARCH state")
+				path_waypoints = PackedVector2Array()
+				current_waypoint_index = 0
+				set_state(State.SEARCH)
+
+# Finds an ally in COMBAT with active LOS on the player
+func find_ally_with_eyes_on_player() -> Node:
+	for enemy_node in get_tree().get_nodes_in_group("enemies"):
+		if enemy_node == self or not is_instance_valid(enemy_node):
+			continue
+		if enemy_node.current_state == State.COMBAT and enemy_node.has_player_in_sight \
+				and enemy_node.player_ref and is_instance_valid(enemy_node.player_ref):
+			return enemy_node
+	return null
 
 func attack_player():
 	if not can_attack or not player_ref:
 		return
-	
+
 	print("Enemy attacking player!")
 	player_ref.take_damage(damage_amount)
-	
-	# Attack cooldown
+
 	can_attack = false
 	last_attack_time = Time.get_ticks_msec()
 	await get_tree().create_timer(attack_cooldown).timeout
@@ -318,7 +360,6 @@ func attack_player():
 func update_search(delta):
 	search_timer -= delta
 
-	# Return to patrol after search duration ends
 	if search_timer <= 0:
 		print("Search duration ended, returning to PATROL state")
 		set_state(State.PATROL)
@@ -332,36 +373,74 @@ func update_search(delta):
 		pick_new_search_target()
 
 func update_rotation_based_on_movement(delta):
-	# Only update rotation if moving
 	if velocity.length() > 0.1:
 		rotation = velocity.angle()
 	elif is_rotating:
 		rotation = rot_start + sin(Time.get_ticks_msec()/1000.0 * rotation_speed) * deg_to_rad(rotation_angle/2.0)
 
 
+# A* pursuit when no direct LOS; falls back to NavigationAgent2D if no path found
+func move_towards_target_with_astar(target_position: Vector2, movement_speed: float):
+	# Recompute the path if missing, exhausted, or target moved
+	var need_new_path: bool = path_waypoints.is_empty() or current_waypoint_index >= path_waypoints.size()
+	if astar_target_position.distance_to(target_position) > 16.0:
+		need_new_path = true
+
+	if need_new_path:
+		astar_target_position = target_position
+		var path: PackedVector2Array = PathfindingManager.get_world_path(global_position, target_position)
+
+		if path.is_empty():
+			print(name, ": A* path empty/not found, falling back to NavigationAgent2D")
+			path_waypoints = PackedVector2Array()
+			current_waypoint_index = 0
+			move_towards_target(target_position, movement_speed)
+			return
+
+		print(name, ": A* path found with ", path.size(), " waypoints")
+		path_waypoints = path
+		current_waypoint_index = 0
+
+	if path_waypoints.is_empty():
+		move_towards_target(target_position, movement_speed)
+		return
+
+	# Skip waypoints already reached
+	while current_waypoint_index < path_waypoints.size() - 1 and global_position.distance_to(path_waypoints[current_waypoint_index]) < 10.0:
+		current_waypoint_index += 1
+		print(name, ": Moving to waypoint ", current_waypoint_index, " at position ", path_waypoints[current_waypoint_index])
+
+	var waypoint_target: Vector2 = path_waypoints[current_waypoint_index]
+	var direction = (waypoint_target - global_position).normalized()
+	velocity = direction * movement_speed
+
+	# Clear path after reaching the final waypoint so it recomputes next time
+	if current_waypoint_index >= path_waypoints.size() - 1 and global_position.distance_to(waypoint_target) < 10.0:
+		print(name, ": Reached final A* waypoint")
+		path_waypoints = PackedVector2Array()
+		current_waypoint_index = 0
+
+
 func move_towards_target(target_position: Vector2, movement_speed: float):
 	if not navigation_agent:
 		return
-		
+
 	navigation_agent.target_position = target_position
-	
+
 	if navigation_agent.is_navigation_finished():
 		return
-		
+
 	var next_pos = navigation_agent.get_next_path_position()
 	var direction = (next_pos - global_position).normalized()
 	velocity = direction * movement_speed
 
 
 func _on_navigation_finished():
-	# Navigation target reached
 	pass
 
 func _physics_process(delta):
-	# Reset velocity
 	velocity = Vector2.ZERO
 
-	# Update state behavior
 	match current_state:
 		State.PATROL:
 			update_patrol(delta)
@@ -369,8 +448,7 @@ func _physics_process(delta):
 			update_combat(delta)
 		State.SEARCH:
 			update_search(delta)
-	
-	# Check LOS to player if in vision cone
+
 	if player_ref and is_instance_valid(player_ref):
 		var los = has_line_of_sight_to(player_ref.global_position)
 		if los != has_player_in_sight:
@@ -379,8 +457,7 @@ func _physics_process(delta):
 				set_state(State.COMBAT)
 			elif not los and current_state == State.COMBAT:
 				set_state(State.SEARCH)
-	
-	# Apply movement
+
 	if velocity.length() > 0:
 		move_and_slide()
 
@@ -388,7 +465,7 @@ func _physics_process(delta):
 func _on_vision_cone_area_2_body_entered(body: Node2D):
 	if body == self or body.get_parent() == self:
 		return
-	  
+
 	if body.name == "Player" or body.is_in_group("player"):
 		print("Player entered vision cone")
 		player_ref = body
@@ -399,12 +476,12 @@ func _on_vision_cone_area_2_body_entered(body: Node2D):
 func _on_vision_cone_area_2_body_exited(body: Node2D):
 	if body == self or body.get_parent() == self:
 		return
-		
+
 	if body.name == "Player" or body.is_in_group("player"):
 		print("Player exited vision cone")
 		has_player_in_sight = false
 		player_ref = null
-		
+
 		if current_state == State.COMBAT:
 			set_state(State.SEARCH)
 			print("Enemy state: COMBAT > SEARCH")
@@ -413,36 +490,31 @@ func _on_vision_cone_area_2_body_exited(body: Node2D):
 func take_damage(damage: int, shot_from_position: Vector2):
 	health -= damage
 	print("Enemy took damage! Health: ", health)
-	
-	# Set last known position to where shot came from
+
 	player_last_known_position = shot_from_position
-	
-	# Always go to combat when shot
+
 	if current_state != State.COMBAT:
 		set_state(State.COMBAT)
-	
-	# Check for death
+
 	if health <= 0:
 		die()
 
 func takedown():
 	if not can_be_meleed:
 		return
-	
+
 	print("Enemy taken down by melee!")
 	die()
 
 func die():
 	print("Enemy died!")
-	# Disable the enemy
 	set_physics_process(false)
 	set_process(false)
-	# Optional: Play death animation
-	# Then remove from scene
+	# TODO: death animation
 	queue_free()
 
+# Called when a failed (non-stealth) melee attempt alerts this enemy
 func player_detected(player):
-	# Called when melee attack fails
 	player_last_known_position = player.global_position
 	if current_state != State.COMBAT:
 		set_state(State.COMBAT)

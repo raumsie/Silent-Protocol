@@ -16,18 +16,23 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 config/name="Silent Protocol"
 run/main_scene="uid://loiasydkfgpm"
-config/features=PackedStringArray("4.6", "GL Compatibility")
+config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
 
 [autoload]
 
 GameManager="*res://Scripts/GameManager.gd"
+PathfindingManager="*uid://cc8byvckmw8vg"
 
 [display]
 
 window/size/viewport_width=1024
 window/size/viewport_height=768
 window/stretch/mode="canvas_items"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/vision_cone_2d/plugin.cfg", "res://addons/gut/plugin.cfg")
 
 [input]
 
