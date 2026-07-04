@@ -354,6 +354,9 @@ func attack_player():
 	can_attack = false
 	last_attack_time = Time.get_ticks_msec()
 	await get_tree().create_timer(attack_cooldown).timeout
+	# Guard against resuming on a freed instance (e.g. killed mid-cooldown)
+	if not is_instance_valid(self):
+		return
 	can_attack = true
 
 
@@ -499,11 +502,18 @@ func take_damage(damage: int, shot_from_position: Vector2):
 	if health <= 0:
 		die()
 
+# Authoritative "has this enemy detected the player" check for stealth melee gating.
+# current_state == COMBAT covers alertness from LOS, being shot, a failed melee, or a radio
+# alert from an ally (even without direct LOS this instant); has_player_in_sight covers the
+# rare same-frame edge case before a fresh LOS gain has committed the state transition.
+func has_spotted_player() -> bool:
+	return current_state == State.COMBAT or has_player_in_sight
+
 func takedown():
 	if not can_be_meleed:
 		return
 
-	print("Enemy taken down by melee!")
+	print("Enemy taken down by melee! ", name, " at ", global_position)
 	die()
 
 func die():

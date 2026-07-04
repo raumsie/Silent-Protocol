@@ -52,13 +52,13 @@ func shoot():
 		global_position,
 		reticle.global_position
 	)
-	query.collision_mask = 2  # Enemy collision layer
+	query.collision_mask = 1  # Enemy collision layer
 
 	var result = space_state.intersect_ray(query)
 
 	if result:
 		var collider = result["collider"]
-		if collider and collider.is_in_group("enemy"):
+		if collider and collider.is_in_group("enemies"):
 			print("Hit enemy!")
 			collider.take_damage(pistol_damage, global_position)
 
@@ -96,21 +96,23 @@ func melee_attack():
 	circle_shape.radius = melee_range
 	query.shape = circle_shape
 	query.transform = global_transform
-	query.collision_mask = 2  # Enemy layer
+	query.collision_mask = 1  # Enemy layer
 
 	var results = space_state.intersect_shape(query)
 
 	for result in results:
 		var enemy = result["collider"]
-		if enemy and enemy.is_in_group("enemy"):
-			if is_behind_enemy(enemy):
+		if enemy and enemy.is_in_group("enemies"):
+			if not enemy.has_spotted_player():
 				print("Melee takedown successful!")
 				enemy.takedown()
 				break
 			else:
-				print("Melee failed: enemy can see you!")
+				print("Melee failed: enemy has already spotted the player!")
 				enemy.player_detected(self)
 
+# Secondary/unused-by-default facing check, kept available but no longer the success gate
+# (gate is now Enemy.has_spotted_player() — see Scripts/Enemy.gd)
 func is_behind_enemy(enemy) -> bool:
 	var direction_to_player = (global_position - enemy.global_position).normalized()
 	var enemy_forward = Vector2.RIGHT.rotated(enemy.rotation)
