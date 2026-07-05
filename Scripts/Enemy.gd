@@ -370,27 +370,32 @@ func update_combat(delta):
 		var distance_to_player = global_position.distance_to(player_ref.global_position)
 		var direction_to_player = (player_ref.global_position - global_position).normalized()
 
-		if distance_to_player <= attack_range:
-			# In range - hold position instead of closing all the way to melee distance.
-			if not is_holding_at_range:
-				is_holding_at_range = true
+		var should_hold_at_range: bool
+		if is_holding_at_range:
+			# Was holding - keep holding until the player gets past the buffer too.
+			should_hold_at_range = distance_to_player <= attack_range + attack_range_buffer
+		else:
+			# Was advancing - only start holding once truly within attack_range.
+			should_hold_at_range = distance_to_player <= attack_range
+
+		if should_hold_at_range != is_holding_at_range:
+			is_holding_at_range = should_hold_at_range
+			if is_holding_at_range:
 				print(name, ": within attack range (", attack_range, ") - holding position")
-			update_facing(direction_to_player)
+			else:
+				print(name, ": player outside attack range + buffer - advancing to close distance")
+
+		update_facing(direction_to_player)
+
+		if is_holding_at_range:
+			# Hold position (in range, or still in the buffer band after having
+			# closed to range) and fire if allowed.
 			if can_attack and can_fire_yet:
 				attack_player()
-
-		elif distance_to_player > attack_range + attack_range_buffer:
-			# Clearly outside attack range (+ hysteresis buffer) - advance to close the gap.
-			if is_holding_at_range:
-				is_holding_at_range = false
-				print(name, ": player outside attack range + buffer - advancing to close distance")
-			move_towards_target(player_ref.global_position, combat_speed)
-			update_facing(direction_to_player)
-
 		else:
-			# Inside the hysteresis buffer band - hold whatever mode we were already in
-			# (advancing or holding) so the enemy doesn't flicker right at the boundary.
-			update_facing(direction_to_player)
+			# Advance (outside range, or still in the buffer band while closing
+			# in) - keep moving until within attack_range.
+			move_towards_target(player_ref.global_position, combat_speed)
 
 	else:
 		# Player not in sight - pursue last known position
