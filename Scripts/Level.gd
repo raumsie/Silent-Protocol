@@ -6,6 +6,7 @@ func _ready():
 	print("Level loaded")
 	print("Player position: ", $Player.global_position)
 	print("Camera enabled: ", $Player/Camera2D.enabled)
+	Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
 
 	setup_simple_navigation()
 

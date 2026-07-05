@@ -62,12 +62,32 @@ var alert_rebroadcast_timer: float = 0.0
 const ALERT_REBROADCAST_INTERVAL: float = 0.75
 
 # Rotation
-var rot_start: float = 0.0
 var time_since_state_change: float = 0.0
+
+const VISION_CONE_REST_OFFSET: float = -PI / 2.0
+const FACING_MIN_X: float = 0.05
+
+# Animation
+# sprite sheet: hframes = 10, rows 12-15 used by this enemy
+const ENEMY_IDLE_FRAMES: Array[int] = [120, 122, 123]  # row 12, cols 0, 2, 3
+const ENEMY_IDLE_FPS: float = 3.0
+const ENEMY_RUN_ROW_BASE: int = 130  # row 13
+const ENEMY_RUN_FRAME_COUNT: int = 4
+const ENEMY_RUN_FPS: float = 8.0
+const ENEMY_SHOOT_ROW_BASE: int = 140  # row 14
+const ENEMY_SHOOT_FRAME_COUNT: int = 4
+const ENEMY_DEATH_ROW_BASE: int = 150  # row 15
+const ENEMY_DEATH_FRAME_COUNT: int = 8
+const ONESHOT_FPS: float = 10.0
+
+var anim_time: float = 0.0
+var is_playing_oneshot: bool = false
+var oneshot_token: int = 0
 
 
 @onready var vision_cone = $VisionCone2D
 @onready var navigation_agent: NavigationAgent2D = $NavigationAgent2D
+@onready var sprite: Sprite2D = $Sprite2D
 
 # Raycast LOS check against walls (layer 2)
 func has_line_of_sight_to(target: Vector2) -> bool:
@@ -77,7 +97,6 @@ func has_line_of_sight_to(target: Vector2) -> bool:
 	return result.is_empty()
 
 func _ready():
-	rot_start = rotation
 	can_attack = true
 
 	setup_vision_renderer()
@@ -253,9 +272,9 @@ func update_patrol(delta):
 		global_position = path_follow.global_position
 
 		if path_follow.rotates:
-			rotation = path_follow.rotation
+			update_facing(Vector2.RIGHT.rotated(path_follow.rotation))
 		elif is_rotating:
-			rotation = rot_start + sin(Time.get_ticks_msec()/1000.0 * rotation_speed) * deg_to_rad(rotation_angle/2.0)
+			update_idle_vision_sway()
 
 	elif patrol_points.size() > 0:
 		if patrol_index < patrol_points.size():
@@ -270,7 +289,7 @@ func update_patrol(delta):
 	else:
 		# Stationary patrol with rotation
 		if is_rotating:
-			rotation = rot_start + sin(Time.get_ticks_msec()/1000.0 * rotation_speed) * deg_to_rad(rotation_angle/2.0)
+			update_idle_vision_sway()
 
 
 # Combat
@@ -306,8 +325,7 @@ func update_combat(delta):
 			move_towards_target(player_ref.global_position, combat_speed)
 
 			var direction_to_player = (player_ref.global_position - global_position).normalized()
-			if direction_to_player.length() > 0.1:
-				rotation = direction_to_player.angle()
+			update_facing(direction_to_player)
 
 	else:
 		# Player not in sight - pursue last known position
@@ -344,17 +362,46 @@ func find_ally_with_eyes_on_player() -> Node:
 			return enemy_node
 	return null
 
+# Stateless, per-tick idle/run frame calculation
+func update_idle_run_animation(delta: float, is_moving: bool) -> void:
+	if is_playing_oneshot:
+		return
+	anim_time += delta
+	if is_moving:
+		sprite.frame = ENEMY_RUN_ROW_BASE + int(fmod(anim_time * ENEMY_RUN_FPS, ENEMY_RUN_FRAME_COUNT))
+	else:
+		var idle_index = int(fmod(anim_time * ENEMY_IDLE_FPS, ENEMY_IDLE_FRAMES.size()))
+		sprite.frame = ENEMY_IDLE_FRAMES[idle_index]
+
+
+func play_oneshot_animation(row_base: int, frame_count: int, fps: float, on_frame: Callable = Callable()) -> void:
+	oneshot_token += 1
+	var my_token = oneshot_token
+	is_playing_oneshot = true
+
+	for i in range(frame_count):
+		if my_token != oneshot_token:
+			return  # superseded by a newer one-shot trigger
+		sprite.frame = row_base + i
+		if on_frame.is_valid():
+			on_frame.call(i)
+		await get_tree().create_timer(1.0 / fps).timeout
+
+	if my_token == oneshot_token:
+		is_playing_oneshot = false
+
 func attack_player():
 	if not can_attack or not player_ref:
 		return
 
 	print("Enemy attacking player!")
 	player_ref.take_damage(damage_amount)
+	play_oneshot_animation(ENEMY_SHOOT_ROW_BASE, ENEMY_SHOOT_FRAME_COUNT, ONESHOT_FPS)
 
 	can_attack = false
 	last_attack_time = Time.get_ticks_msec()
 	await get_tree().create_timer(attack_cooldown).timeout
-	# Guard against resuming on a freed instance (e.g. killed mid-cooldown)
+	# Guard against resuming on a freed instance (killed mid-cooldown)
 	if not is_instance_valid(self):
 		return
 	can_attack = true
@@ -377,9 +424,25 @@ func update_search(delta):
 
 func update_rotation_based_on_movement(delta):
 	if velocity.length() > 0.1:
-		rotation = velocity.angle()
+		update_facing(velocity)
 	elif is_rotating:
-		rotation = rot_start + sin(Time.get_ticks_msec()/1000.0 * rotation_speed) * deg_to_rad(rotation_angle/2.0)
+		update_idle_vision_sway()
+
+# Sets left/right sprite facing (flip_h) and re-orients the vision cone
+# (independent ofthe body) so LOS detection keeps tracking the same direction
+# that used to drive the whole body's rotation.
+func update_facing(direction: Vector2) -> void:
+	if direction.length() < 0.1:
+		return  # don't flip/re-aim on near-zero movement noise (keep last facing)
+	if abs(direction.x) > FACING_MIN_X:
+		sprite.flip_h = direction.x < 0
+	vision_cone.rotation = direction.angle() + VISION_CONE_REST_OFFSET
+
+# is_rotating/rotation_speed/rotation_angle previously oscillated the whole body's
+# rotation while idle. Now will only oscillate the vision cone's rotation,
+# preserving the scanning behavior without spinning the sprite.
+func update_idle_vision_sway() -> void:
+	vision_cone.rotation = VISION_CONE_REST_OFFSET + sin(Time.get_ticks_msec()/1000.0 * rotation_speed) * deg_to_rad(rotation_angle/2.0)
 
 
 # A* pursuit when no direct LOS; falls back to NavigationAgent2D if no path found
@@ -452,6 +515,9 @@ func _physics_process(delta):
 		State.SEARCH:
 			update_search(delta)
 
+	# velocity is final for this tick now
+	update_idle_run_animation(delta, velocity.length() > 0.1)
+
 	if player_ref and is_instance_valid(player_ref):
 		var los = has_line_of_sight_to(player_ref.global_position)
 		if los != has_player_in_sight:
@@ -502,10 +568,9 @@ func take_damage(damage: int, shot_from_position: Vector2):
 	if health <= 0:
 		die()
 
-# Authoritative "has this enemy detected the player" check for stealth melee gating.
-# current_state == COMBAT covers alertness from LOS, being shot, a failed melee, or a radio
-# alert from an ally (even without direct LOS this instant); has_player_in_sight covers the
-# rare same-frame edge case before a fresh LOS gain has committed the state transition.
+
+# current_state == COMBAT covers alertness from LOS, being shot, a failed melee, 
+# or a radio alert from an ally (even without direct LOS) 
 func has_spotted_player() -> bool:
 	return current_state == State.COMBAT or has_player_in_sight
 
@@ -520,7 +585,10 @@ func die():
 	print("Enemy died!")
 	set_physics_process(false)
 	set_process(false)
-	# TODO: death animation
+	await play_oneshot_animation(ENEMY_DEATH_ROW_BASE, ENEMY_DEATH_FRAME_COUNT, ONESHOT_FPS, func(frame_index):
+		if frame_index == 1:
+			vision_renderer.visible = false
+	)
 	queue_free()
 
 # Called when a failed (non-stealth) melee attempt alerts this enemy

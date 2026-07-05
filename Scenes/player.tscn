@@ -1,21 +1,23 @@
-[gd_scene load_steps=4 format=3 uid="uid://bgqii44imwpuf"]
+[gd_scene format=3 uid="uid://bgqii44imwpuf"]
 
 [ext_resource type="Script" uid="uid://b4uxcemuj3xp" path="res://Scripts/Player.gd" id="1_v0iea"]
 [ext_resource type="Texture2D" uid="uid://h5xsg03ce2w7" path="res://Assets/Players/players blue x3.png" id="2_cvnsp"]
+[ext_resource type="PackedScene" uid="uid://e15kns4pxx0p" path="res://Scenes/reticle.tscn" id="3_reticle"]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_f60y1"]
 height = 20.0
 
-[node name="Player" type="CharacterBody2D"]
+[node name="Player" type="CharacterBody2D" unique_id=1111949927]
 position = Vector2(-1, -1)
 script = ExtResource("1_v0iea")
+reticle_scene = ExtResource("3_reticle")
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=716113168]
 shape = SubResource("CapsuleShape2D_f60y1")
 
-[node name="Camera2D" type="Camera2D" parent="."]
+[node name="Camera2D" type="Camera2D" parent="." unique_id=1090743658]
 
-[node name="Sprite2D" type="Sprite2D" parent="."]
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=798319634]
 position = Vector2(0, -9)
 texture = ExtResource("2_cvnsp")
 hframes = 10

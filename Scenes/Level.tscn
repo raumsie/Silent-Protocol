@@ -2008,6 +2008,7 @@ navigation_polygon = SubResource("NavigationPolygon_tj5wv")
 
 [node name="Enemy2" parent="." unique_id=845805592 node_paths=PackedStringArray("patrol_path") instance=ExtResource("3_xylue")]
 position = Vector2(606, -86)
+collision_mask = 3
 patrol_path = NodePath("../Path2D2")
 
 [node name="Path2D2" type="Path2D" parent="." unique_id=1614727952]

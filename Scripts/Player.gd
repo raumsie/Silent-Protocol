@@ -30,6 +30,22 @@ var is_reloading: bool = false
 var reticle: Node2D
 var is_aiming: bool = false
 
+# Animation (sprite sheet: hframes = 10, vframes = 13)
+const IDLE_FRAME: int = 0
+const RUN_ROW_BASE: int = 30  # row 3
+const RUN_FRAME_COUNT: int = 4
+const RUN_FPS: float = 8.0
+const SHOOT_MELEE_ROW_BASE: int = 40  # row 4
+const SHOOT_MELEE_FRAME_COUNT: int = 4
+const DEATH_ROW_BASE: int = 50  # row 5
+const DEATH_FRAME_COUNT: int = 7
+const ONESHOT_FPS: float = 10.0
+const FACING_MIN_X: float = 0.05
+
+var anim_time: float = 0.0
+var is_playing_oneshot: bool = false
+var oneshot_token: int = 0
+
 func _ready():
 	setup_camera()
 	setup_reticle()
@@ -38,12 +54,25 @@ func _ready():
 func setup_reticle():
 	if reticle_scene:
 		reticle = reticle_scene.instantiate()
-		get_parent().add_child(reticle)  # Add to level, not player
-		print("Reticle created")
+		# Player._ready() runs while its own parent (Level) is still setting up its
+		# child tree, so an immediate add_child() here fails ("Parent node is busy
+		# setting up children") and silently never parents the reticle - it then never
+		# renders and its _process() never runs, freezing reticle.global_position at
+		# whatever it was last set to instead of tracking the mouse. Defer both the
+		# reparenting and the initial position set until the parent is free.
+		call_deferred("_finish_reticle_setup")
+
+
+func _finish_reticle_setup():
+	get_parent().add_child(reticle)  # Add to level, not player
+	reticle.global_position = global_position
+	print("Reticle created")
 
 func shoot():
 	if not can_shoot or is_reloading or not reticle:
 		return
+
+	play_oneshot_animation(SHOOT_MELEE_ROW_BASE, SHOOT_MELEE_FRAME_COUNT, ONESHOT_FPS)
 
 	print("Player shooting!")
 
@@ -88,6 +117,8 @@ func melee_attack():
 	if not can_melee:
 		return
 
+	play_oneshot_animation(SHOOT_MELEE_ROW_BASE, SHOOT_MELEE_FRAME_COUNT, ONESHOT_FPS)
+
 	print("Attempting melee attack")
 
 	var space_state = get_world_2d().direct_space_state
@@ -112,7 +143,7 @@ func melee_attack():
 				enemy.player_detected(self)
 
 # Secondary/unused-by-default facing check, kept available but no longer the success gate
-# (gate is now Enemy.has_spotted_player() — see Scripts/Enemy.gd)
+# (gate is now Enemy.has_spotted_player() - see Scripts/Enemy.gd)
 func is_behind_enemy(enemy) -> bool:
 	var direction_to_player = (global_position - enemy.global_position).normalized()
 	var enemy_forward = Vector2.RIGHT.rotated(enemy.rotation)
@@ -143,6 +174,41 @@ func _physics_process(delta):
 
 	move_and_slide()
 
+	update_idle_run_animation(delta, velocity.length() > 0.1)
+	update_facing_towards_reticle()
+
+func update_idle_run_animation(delta: float, is_moving: bool) -> void:
+	if is_playing_oneshot:
+		return
+	if is_moving:
+		anim_time += delta
+		sprite.frame = RUN_ROW_BASE + int(fmod(anim_time * RUN_FPS, RUN_FRAME_COUNT))
+	else:
+		anim_time = 0.0
+		sprite.frame = IDLE_FRAME
+
+# Face towards the aim reticle rather than movement direction
+func update_facing_towards_reticle() -> void:
+	if not reticle:
+		return
+	var to_reticle = reticle.global_position - global_position
+	if abs(to_reticle.x) > FACING_MIN_X:
+		sprite.flip_h = to_reticle.x < 0
+
+func play_oneshot_animation(row_base: int, frame_count: int, fps: float) -> void:
+	oneshot_token += 1
+	var my_token = oneshot_token
+	is_playing_oneshot = true
+
+	for i in range(frame_count):
+		if my_token != oneshot_token:
+			return  # superseded by a newer one-shot trigger
+		sprite.frame = row_base + i
+		await get_tree().create_timer(1.0 / fps).timeout
+
+	if my_token == oneshot_token:
+		is_playing_oneshot = false
+
 func take_damage(amount: int):
 	if not is_alive:
 		return
@@ -168,4 +234,8 @@ func die():
 
 	print("Player has died.")
 	is_alive = false
+
+	# Play the death clip fully before calling lose_game()
+	await play_oneshot_animation(DEATH_ROW_BASE, DEATH_FRAME_COUNT, ONESHOT_FPS)
+
 	GameManager.lose_game()
