@@ -1,7 +1,7 @@
 extends Node
 
 # Level's TileMap, found via the navigation_tilemap group
-@onready var tile_map: TileMap = get_tree().get_first_node_in_group("navigation_tilemap")
+var tile_map: TileMap
 
 var astar_grid: AStarGrid2D
 
@@ -10,6 +10,13 @@ const CELL_SIZE: int = 32  # assumes 32px tiles
 func _ready():
 	# Wait a frame for the TileMap to be ready
 	await get_tree().process_frame
+	refresh()
+
+# Autoloads survive get_tree().reload_current_scene(), but the old TileMap
+# does not, so this must be called again (from the new Level's _ready)
+# whenever the scene reloads, or tile_map/astar_grid go stale.
+func refresh():
+	tile_map = get_tree().get_first_node_in_group("navigation_tilemap")
 	setup_astar_grid()
 
 func setup_astar_grid():

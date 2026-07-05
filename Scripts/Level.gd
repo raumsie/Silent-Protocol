@@ -8,6 +8,7 @@ func _ready():
 	print("Camera enabled: ", $Player/Camera2D.enabled)
 	Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
 
+	PathfindingManager.refresh()
 	setup_simple_navigation()
 
 func setup_simple_navigation():
