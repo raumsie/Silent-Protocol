@@ -27,6 +27,7 @@ func win_game():
 		await get_tree().create_timer(2.0).timeout
 		get_tree().paused = false
 		get_tree().reload_current_scene()
+		current_state = "playing"
 
 func lose_game():
 	if current_state == "playing":
@@ -37,3 +38,4 @@ func lose_game():
 		await get_tree().create_timer(1.0).timeout
 		get_tree().paused = false
 		get_tree().reload_current_scene()
+		current_state = "playing"

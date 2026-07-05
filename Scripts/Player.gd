@@ -45,6 +45,7 @@ const FACING_MIN_X: float = 0.05
 var anim_time: float = 0.0
 var is_playing_oneshot: bool = false
 var oneshot_token: int = 0
+var damage_flash_token: int = 0
 
 func _ready():
 	setup_camera()
@@ -223,10 +224,12 @@ func take_damage(amount: int):
 		die()
 
 func damage_flash():
-	var original_modulate = modulate
+	damage_flash_token += 1
+	var my_token = damage_flash_token
 	modulate = Color.RED
 	await get_tree().create_timer(damage_flash_duration).timeout
-	modulate = original_modulate
+	if my_token == damage_flash_token:
+		modulate = Color.WHITE
 
 func die():
 	if not is_alive:

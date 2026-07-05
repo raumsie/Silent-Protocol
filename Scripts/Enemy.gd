@@ -28,6 +28,17 @@ enum State { PATROL, COMBAT, SEARCH }
 @export var can_be_meleed: bool = true
 @export var damage_amount: int = 25
 @export var attack_cooldown: float = 0.50
+# Ranged engagement distance. 250px (~7.8 tiles @ 32px tiles) sits comfortably inside
+# the vision cone's max_distance (400px, enemy.tscn's VisionCone2D) so an enemy can still
+# see the player closing in before they're even in range, while being clearly longer than
+# the player's own melee_range (50px, Player.gd) so this reads as "ranged," not point-blank.
+@export var attack_range: float = 250.0
+# Hysteresis band around attack_range so the enemy doesn't flicker every frame between
+# "advancing" and "holding" right at the boundary (scaled up from the old fixed 40/45 split).
+@export var attack_range_buffer: float = 40.0
+# Reaction time after directly spotting the player with this enemy's own vision cone
+# before it's allowed to open fire (does not apply to radio-alerted/shot/melee-detected entries).
+@export var reaction_time: float = 1.0
 
 # Combat
 var current_state: State = State.PATROL
@@ -60,6 +71,10 @@ var astar_target_position: Vector2 = Vector2.ZERO
 # Periodic re-broadcast interval while actively chasing
 var alert_rebroadcast_timer: float = 0.0
 const ALERT_REBROADCAST_INTERVAL: float = 0.75
+
+# Ranged combat: reaction delay + approach-and-hold
+var can_fire_yet: bool = true
+var is_holding_at_range: bool = false
 
 # Rotation
 var time_since_state_change: float = 0.0
@@ -280,6 +295,11 @@ func start_combat():
 	print("Starting combat")
 	combat_timer = 0.0
 	alert_rebroadcast_timer = 0.0
+	is_holding_at_range = false
+	# Default: no reaction delay (radio-alerted/shot/melee-detected entries can fire right away).
+	# The direct-own-LOS transition in _physics_process overrides this via _arm_reaction_delay()
+	# immediately after calling set_state(State.COMBAT).
+	can_fire_yet = true
 
 func start_search():
 	print("Starting search")
@@ -348,14 +368,28 @@ func update_combat(delta):
 			GameManager.player_spotted.emit(self, player_ref.global_position)
 
 		var distance_to_player = global_position.distance_to(player_ref.global_position)
+		var direction_to_player = (player_ref.global_position - global_position).normalized()
 
-		if distance_to_player < 40.0 and can_attack:
-			attack_player()
+		if distance_to_player <= attack_range:
+			# In range - hold position instead of closing all the way to melee distance.
+			if not is_holding_at_range:
+				is_holding_at_range = true
+				print(name, ": within attack range (", attack_range, ") - holding position")
+			update_facing(direction_to_player)
+			if can_attack and can_fire_yet:
+				attack_player()
 
-		elif distance_to_player > 45.0:
+		elif distance_to_player > attack_range + attack_range_buffer:
+			# Clearly outside attack range (+ hysteresis buffer) - advance to close the gap.
+			if is_holding_at_range:
+				is_holding_at_range = false
+				print(name, ": player outside attack range + buffer - advancing to close distance")
 			move_towards_target(player_ref.global_position, combat_speed)
+			update_facing(direction_to_player)
 
-			var direction_to_player = (player_ref.global_position - global_position).normalized()
+		else:
+			# Inside the hysteresis buffer band - hold whatever mode we were already in
+			# (advancing or holding) so the enemy doesn't flicker right at the boundary.
 			update_facing(direction_to_player)
 
 	else:
@@ -420,6 +454,20 @@ func play_oneshot_animation(row_base: int, frame_count: int, fps: float, on_fram
 
 	if my_token == oneshot_token:
 		is_playing_oneshot = false
+
+# Reaction time before an enemy that just spotted the player with its own vision cone
+# is allowed to open fire. Only called from the direct-own-LOS COMBAT transition in
+# _physics_process - not from radio alerts, take_damage, or player_detected (those are
+# already considered "reacted" and keep the can_fire_yet = true default from start_combat()).
+func _arm_reaction_delay() -> void:
+	can_fire_yet = false
+	print(name, ": spotted player directly - reaction delay armed (", reaction_time, "s) before firing is allowed")
+	await get_tree().create_timer(reaction_time).timeout
+	if not is_instance_valid(self):
+		return
+	can_fire_yet = true
+	print(name, ": reaction delay elapsed - cleared to fire")
+
 
 func attack_player():
 	if not can_attack or not player_ref:
@@ -556,6 +604,10 @@ func _physics_process(delta):
 			has_player_in_sight = los
 			if los and current_state != State.COMBAT:
 				set_state(State.COMBAT)
+				# Own-eyes spot: arm the reaction delay before this enemy can fire.
+				# Radio alerts / take_damage / player_detected do NOT call this, so those
+				# entries into COMBAT keep the can_fire_yet = true default set in start_combat().
+				_arm_reaction_delay()
 			elif not los and current_state == State.COMBAT:
 				set_state(State.SEARCH)
 
@@ -568,6 +620,8 @@ func _on_vision_cone_area_2_body_entered(body: Node2D):
 		return
 
 	if body.name == "Player" or body.is_in_group("player"):
+		if player_ref == body:
+			return
 		print("Player entered vision cone")
 		player_ref = body
 		player_last_known_position = body.global_position
