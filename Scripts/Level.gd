@@ -30,7 +30,7 @@ func setup_simple_navigation():
 	])
 	source_geometry.add_traversable_outline(boundary)
 
-	# Carve a hole per wall in group "walls"; holes wind opposite to the outer boundary
+	# Carve a hole per wall in group "walls"
 	for wall in get_tree().get_nodes_in_group("walls"):
 		for child in wall.get_children():
 			if child is CollisionShape2D and child.shape is RectangleShape2D:

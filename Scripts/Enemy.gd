@@ -83,6 +83,7 @@ const ONESHOT_FPS: float = 10.0
 var anim_time: float = 0.0
 var is_playing_oneshot: bool = false
 var oneshot_token: int = 0
+var is_moving_override: bool = false
 
 
 @onready var vision_cone = $VisionCone2D
@@ -108,6 +109,9 @@ func _ready():
 
 	if not GameManager.player_spotted.is_connected(_on_global_alert):
 		GameManager.player_spotted.connect(_on_global_alert)
+
+	if not GameManager.player_lost.is_connected(_on_global_player_lost):
+		GameManager.player_lost.connect(_on_global_player_lost)
 
 	# Wait for plugin to initialize
 	await get_tree().create_timer(0.5).timeout
@@ -205,6 +209,29 @@ func _on_global_alert(spotted_enemy: Node, player_pos: Vector2):
 	is_alerted = false
 
 
+# Radio "lost" broadcast from another enemy that just lost sight of the player and
+# dropped to SEARCH. Any enemy that doesn't currently have its own eyes on the player
+# should give up whatever it was doing (PATROL, blind COMBAT pursuit, or an already
+# in-progress SEARCH) and go look around the fresh last-known position too.
+func _on_global_player_lost(losing_enemy: Node, last_known_position: Vector2):
+	if losing_enemy == self or has_player_in_sight:
+		return
+
+	player_last_known_position = last_known_position
+	path_waypoints = PackedVector2Array()
+	current_waypoint_index = 0
+
+	if current_state == State.SEARCH:
+		# Already searching - just redirect it at the fresher last-known position
+		print(name, ": already searching, redirecting to fresher last-known position from ", losing_enemy.name)
+		search_center = last_known_position
+		search_timer = search_duration
+		pick_new_search_target()
+	else:
+		print(name, ": ", losing_enemy.name, " lost the player - joining the search near ", last_known_position)
+		set_state(State.SEARCH)
+
+
 func setup_vision_renderer():
 	if vision_renderer:
 		vision_renderer.visible = true
@@ -268,8 +295,12 @@ func pick_new_search_target():
 
 func update_patrol(delta):
 	if use_patrol_path and path_follow:
+		var previous_position = global_position
 		path_follow.progress += patrol_speed * delta
 		global_position = path_follow.global_position
+		# Path-follow movement bypasses velocity/move_and_slide, so animation
+		# state has to be derived from actual position delta instead.
+		is_moving_override = previous_position.distance_to(global_position) > 0.1
 
 		if path_follow.rotates:
 			update_facing(Vector2.RIGHT.rotated(path_follow.rotation))
@@ -506,6 +537,7 @@ func _on_navigation_finished():
 
 func _physics_process(delta):
 	velocity = Vector2.ZERO
+	is_moving_override = false
 
 	match current_state:
 		State.PATROL:
@@ -516,7 +548,7 @@ func _physics_process(delta):
 			update_search(delta)
 
 	# velocity is final for this tick now
-	update_idle_run_animation(delta, velocity.length() > 0.1)
+	update_idle_run_animation(delta, velocity.length() > 0.1 or is_moving_override)
 
 	if player_ref and is_instance_valid(player_ref):
 		var los = has_line_of_sight_to(player_ref.global_position)

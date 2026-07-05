@@ -18,12 +18,13 @@ use_patrol_path = true
 visible = false
 shape = SubResource("CapsuleShape2D_ne65n")
 
-[node name="VisionCone2D" parent="." node_paths=PackedStringArray("write_polygon2d") instance=ExtResource("2_1f0kj")]
+[node name="VisionCone2D" parent="." node_paths=PackedStringArray("write_polygon2d", "write_collision_polygon") instance=ExtResource("2_1f0kj")]
 show_behind_parent = true
 rotation = -1.5707964
 angle_deg = 45
 max_distance = 400.0
 write_polygon2d = NodePath("VisionConeRenderer2")
+write_collision_polygon = NodePath("VisionConeArea2/VisionConeCollider")
 
 [node name="VisionConeRenderer2" type="Polygon2D" parent="VisionCone2D"]
 show_behind_parent = true

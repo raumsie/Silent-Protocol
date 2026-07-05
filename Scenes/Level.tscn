@@ -1987,6 +1987,7 @@ collision_mask = 3
 search_color = Color(0.70100665, 0.71, 0.17040001, 0.60784316)
 search_duration = 10.0
 combat_speed = 100.0
+search_speed = 90.0
 patrol_path = NodePath("../Path2D")
 
 [node name="Wall" parent="." unique_id=100786468 groups=["walls"] instance=ExtResource("6_tj5wv")]

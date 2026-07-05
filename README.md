@@ -16,7 +16,7 @@ Silent Protocol is a stealth-action prototype centered on guard AI that actually
 - **PATROL / COMBAT / SEARCH state machine** — enemies patrol fixed paths or point sets, snap into COMBAT (vision cone turns red) the moment they see the player, and fall back to a timed SEARCH phase (vision cone turns orange) if they lose sight, before resuming patrol (vision cone green).
 - **Global alert / radio-delay propagation** — when one enemy spots the player, it broadcasts to every other enemy in the level; each one engages after a short "radio call" delay. Enemies actively tracking the player also periodically re-broadcast the player's live position, so allies converging on a stale last-known position can pick up a fresher one from a teammate who still has you within LOS, rather than reverting to SEARCH the moment they arrive.
 - **A\* pathfinding around walls** — a dedicated `PathfindingManager` autoload builds an `AStarGrid2D` from the level's wall geometry, so enemies pursuing without direct line of sight route intelligently around obstacles instead of getting stuck. Falls back to standard Godot navigation when a path can't be found.
-- **Player mechanics** — Combat is still a work in progress: the player doesn't yet have finished attack abilities, so damage isn't wired up to enemies at this stage.
+- **Player mechanics** — Player can shoot enemies or do a stealth takedown (if out of enemy LOS) by pressing the F key. 
 
 ## Controls
 
@@ -44,7 +44,6 @@ This project uses [GUT (Godot Unit Test)](https://github.com/bitwes/Gut) for aut
 
 - **[Vision Cone 2D](https://github.com/sirdorius)** by sirdorius — `res://addons/vision_cone_2d/`, dual-licensed MIT / Apache-2.0. Powers the enemy vision-cone detection system.
 - **[GUT (Godot Unit Test)](https://github.com/bitwes/Gut)** by Tom "Butch" Wesley — `res://addons/gut/`, MIT-licensed. Used as the project's test framework (development dependency, not a runtime gameplay asset).
-- UI elements under `Assets/UI/STRANDED UI PACK/` appear to be a third-party asset pack; no accompanying license or attribution file was found in that directory. Source/license still needs to be confirmed.
 
 ## Author
 

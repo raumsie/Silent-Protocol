@@ -28,7 +28,7 @@ func setup_astar_grid():
 	astar_grid.offset = Vector2(CELL_SIZE / 2, CELL_SIZE / 2)  # Center paths on tiles
 	astar_grid.update()
 
-	# Tiles carry no walkability data (ground art only) — mark solid cells from
+	# Tiles carry no walkability data (ground art only). Mark solid cells from
 	# wall collision shapes instead, same approach as Level.gd's navmesh carving.
 	var solid_count := 0
 	for wall in get_tree().get_nodes_in_group("walls"):
