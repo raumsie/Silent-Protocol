@@ -107,6 +107,7 @@ const ENEMY_PROJECTILE_MAX_TRAVEL_DISTANCE: float = 400.0
 var anim_time: float = 0.0
 var is_playing_oneshot: bool = false
 var oneshot_token: int = 0
+var is_dying: bool = false
 var is_moving_override: bool = false
 
 
@@ -686,6 +687,10 @@ func takedown():
 	die()
 
 func die():
+	if is_dying:
+		return
+	is_dying = true
+
 	print("Enemy died!")
 	set_physics_process(false)
 	set_process(false)
