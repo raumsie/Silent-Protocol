@@ -42,6 +42,15 @@ const DEATH_FRAME_COUNT: int = 7
 const ONESHOT_FPS: float = 10.0
 const FACING_MIN_X: float = 0.05
 
+# Projectile (res://Scenes/projectile.tscn) - see Scripts/Projectile.gd for animation constants.
+# Speed: 6.5x this Player's own movement speed (200) -> reads as "fast bullet," not instant hitscan,
+# not a slow visible orb. Max distance: 800 = 2x the enemy vision cone's max_distance (400,
+# Enemy.gd) - Player.gd has no equivalent exported "range" to anchor against, so this uses the
+# vision cone's scale as the nearest existing reference point in the project.
+const PROJECTILE_SCENE: PackedScene = preload("res://Scenes/projectile.tscn")
+const PLAYER_PROJECTILE_SPEED: float = 1300.0
+const PLAYER_PROJECTILE_MAX_DISTANCE: float = 800.0
+
 var anim_time: float = 0.0
 var is_playing_oneshot: bool = false
 var oneshot_token: int = 0
@@ -77,20 +86,11 @@ func shoot():
 
 	print("Player shooting!")
 
-	var space_state = get_world_2d().direct_space_state
-	var query = PhysicsRayQueryParameters2D.create(
-		global_position,
-		reticle.global_position
-	)
-	query.collision_mask = 1  # Enemy collision layer
-
-	var result = space_state.intersect_ray(query)
-
-	if result:
-		var collider = result["collider"]
-		if collider and collider.is_in_group("enemies"):
-			print("Hit enemy!")
-			collider.take_damage(pistol_damage, global_position)
+	var direction = (reticle.global_position - global_position).normalized()
+	var projectile = PROJECTILE_SCENE.instantiate()
+	projectile.global_position = global_position
+	projectile.launch(direction, PLAYER_PROJECTILE_SPEED, pistol_damage, "player", PLAYER_PROJECTILE_MAX_DISTANCE)
+	get_parent().add_child(projectile)  # Add to level, not player (see setup_reticle())
 
 	# TODO: shooting effects (muzzle flash, sound, recoil)
 

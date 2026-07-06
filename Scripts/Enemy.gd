@@ -95,6 +95,15 @@ const ENEMY_DEATH_ROW_BASE: int = 150  # row 15
 const ENEMY_DEATH_FRAME_COUNT: int = 8
 const ONESHOT_FPS: float = 10.0
 
+# Projectile (res://Scenes/projectile.tscn) - see Scripts/Projectile.gd for animation constants.
+# Speed: ~6.7x combat_speed (150) -> fast but visibly traveling, not instant. Max travel distance:
+# attack_range + attack_range_buffer (290) is the farthest an enemy would still be "holding" and
+# firing from, so 400 (== the vision cone's own max_distance, a natural existing cap) gives a shot
+# fired right at that boundary enough room to still reach a player who steps back mid-flight.
+const PROJECTILE_SCENE: PackedScene = preload("res://Scenes/projectile.tscn")
+const ENEMY_PROJECTILE_SPEED: float = 1000.0
+const ENEMY_PROJECTILE_MAX_TRAVEL_DISTANCE: float = 400.0
+
 var anim_time: float = 0.0
 var is_playing_oneshot: bool = false
 var oneshot_token: int = 0
@@ -479,7 +488,11 @@ func attack_player():
 		return
 
 	print("Enemy attacking player!")
-	player_ref.take_damage(damage_amount)
+	var direction = (player_ref.global_position - global_position).normalized()
+	var projectile = PROJECTILE_SCENE.instantiate()
+	projectile.global_position = global_position
+	projectile.launch(direction, ENEMY_PROJECTILE_SPEED, damage_amount, "enemy", ENEMY_PROJECTILE_MAX_TRAVEL_DISTANCE)
+	get_parent().add_child(projectile)
 	play_oneshot_animation(ENEMY_SHOOT_ROW_BASE, ENEMY_SHOOT_FRAME_COUNT, ONESHOT_FPS)
 
 	can_attack = false
