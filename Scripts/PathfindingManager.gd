@@ -1,7 +1,7 @@
 extends Node
 
-# Level's TileMap, found via the navigation_tilemap group
-var tile_map: TileMap
+# Level's ground TileMapLayer, found via the navigation_tilemap group
+var tile_map: TileMapLayer
 
 var astar_grid: AStarGrid2D
 
@@ -20,7 +20,7 @@ func refresh():
 	setup_astar_grid()
 
 func setup_astar_grid():
-	if not tile_map:
+	if not is_instance_valid(tile_map):
 		print("PathfindingManager: TileMap not found!")
 		return
 
@@ -61,7 +61,7 @@ func setup_astar_grid():
 	print("AStarGrid2D initialized. Region: ", astar_grid.region, " | Solid points: ", solid_count)
 
 func get_world_path(from: Vector2, to: Vector2) -> PackedVector2Array:
-	if not astar_grid:
+	if not astar_grid or not is_instance_valid(tile_map):
 		return PackedVector2Array()
 
 	var from_grid = tile_map.local_to_map(tile_map.to_local(from))
