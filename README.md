@@ -4,18 +4,18 @@ A 2D top-down stealth game built in Godot 4. Sneak past patrolling guards, stay 
 
 ## Description
 
-Silent Protocol is a stealth-action prototype centered on guard AI that actually behaves like a coordinated team. Enemies patrol fixed routes, spot the player through raycast-based vision cones, and — crucially — talk to each other: when one guard sees you, the alert propagates to every other guard in the level after a short radio delay, and they'll converge on your last known position using pathfinding that routes around walls. Losing line of sight buys you a search phase, not an instant reset.
+Silent Protocol is a stealth-action game demo centered on guard AI that actually behaves like a coordinated team. Enemies patrol fixed routes, spot the player through raycast-based vision cones, and share the player's position with each other. When one guard sees you, the alert propagates to every other guard in the level after a short radio delay, and they'll converge on your last known position using A* pathfinding that routes around walls. Losing line of sight buys you a search phase, not an instant reset.
 
 ## Screenshots
 ![Enemies searching](./images/sp_search2.png)
 
 ## Features
 
-- **Vision-cone detection** — each enemy casts a configurable raycast-based vision cone via the `vision_cone_2d` addon, layered with a direct line-of-sight raycast so walls reliably block detection.
-- **PATROL / COMBAT / SEARCH state machine** — enemies patrol fixed paths or point sets, snap into COMBAT (vision cone turns red) the moment they see the player, and fall back to a timed SEARCH phase (vision cone turns orange) if they lose sight, before resuming patrol (vision cone green).
+- **Vision-cone detection**: each enemy casts a configurable raycast-based vision cone via the `vision_cone_2d` addon, layered with a direct line-of-sight raycast so walls reliably block detection.
+- **PATROL / COMBAT / SEARCH state machine**: enemies patrol fixed paths or point sets, snap into COMBAT (vision cone turns red) the moment they see the player, and fall back to a timed SEARCH phase (vision cone turns orange) if they lose sight, before resuming patrol (vision cone green).
 - **Global alert / radio-delay propagation** — when one enemy spots the player, it broadcasts to every other enemy in the level; each one engages after a short "radio call" delay. Enemies actively tracking the player also periodically re-broadcast the player's live position, so allies converging on a stale last-known position can pick up a fresher one from a teammate who still has you within LOS, rather than reverting to SEARCH the moment they arrive.
-- **A\* pathfinding around walls** — a dedicated `PathfindingManager` autoload builds an `AStarGrid2D` from the level's wall geometry, so enemies pursuing without direct line of sight route intelligently around obstacles instead of getting stuck. Falls back to standard Godot navigation when a path can't be found.
-- **Player mechanics** — Player can shoot enemies or do a stealth takedown (if out of enemy LOS) by pressing the F key. 
+- **A\* pathfinding around walls**: a dedicated `PathfindingManager` autoload builds an `AStarGrid2D` from the level's wall geometry, so enemies pursuing without direct line of sight route intelligently around obstacles instead of getting stuck. Falls back to standard Godot navigation when a path can't be found.
+- **Player mechanics**: Player can shoot enemies or do a stealth takedown (if out of enemy LOS) by pressing the F key. 
 
 ## Controls
 
