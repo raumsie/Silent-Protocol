@@ -15,7 +15,7 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 [application]
 
 config/name="Silent Protocol"
-run/main_scene="uid://loiasydkfgpm"
+run/main_scene="uid://be2p3xxb0j1x4"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
 
