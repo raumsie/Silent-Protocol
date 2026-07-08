@@ -7,7 +7,7 @@ A 2D top-down stealth game built in Godot 4. Sneak past patrolling guards, stay 
 Silent Protocol is a stealth-action prototype centered on guard AI that actually behaves like a coordinated team. Enemies patrol fixed routes, spot the player through raycast-based vision cones, and — crucially — talk to each other: when one guard sees you, the alert propagates to every other guard in the level after a short radio delay, and they'll converge on your last known position using pathfinding that routes around walls. Losing line of sight buys you a search phase, not an instant reset.
 
 ## Screenshots
-[./images/sp_search.png]
+![Enemies searching](./images/sp_search.png)
 
 ## Features
 
